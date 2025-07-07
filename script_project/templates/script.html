@@ -1,0 +1,887 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>剧本可视化解析</title>
+    <link href="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.1.3/css/bootstrap.min.css" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/echarts@4.9.0/dist/echarts.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts-wordcloud@1.1.1/dist/echarts-wordcloud.min.js"></script>
+    <style>
+      /* 整体页面设置 */
+      body {
+        background-color: rgb(116, 185, 254);
+        background-image: url("{% static 'images/script-background.jpg' %}");
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 0 2vw; /* 左右留白 */
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+      }
+      /* 外层容器：三列均铺满整个屏幕 */
+      .container {
+        display: flex;
+        width: 100%;
+        height: 95%;
+        gap: 10px;
+      }
+      /* 三列布局：左右两列相同，中间列稍宽 */
+      .column {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .column.middle {
+        flex: 1.5;
+      }
+      /* 模块盒子：上下分区，外框带边框 */
+      .module-box {
+        border: 1px solid #ccc;
+        background-color: #fff;
+        border-radius: 8px;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+      }
+      /* 模块头：小块区域显示模块名称 */
+      .module-header {
+        background-color: #f7f7f7;
+        padding: 3px;
+        text-align: center;
+        font-weight: bold;
+        font-size: 1em;
+        border-bottom: 1px solid #ccc;
+      }
+      /* 模块内容：填充区域显示图表或文本 */
+      .module-content {
+        flex: 1;
+        padding: 10px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+      /* 左右两列内，每个模块均分高度 */
+      .column:not(.middle) .module-box {
+        flex: 1;
+      }
+      /* 中间列三个模块：上部（人物关系图）、中部（时间轴）、下部（剧本文本） */
+      .box-top { flex: 4.5; }
+      .box-middle { flex: 2.25; }  /* 时间轴区域增高 */
+      .box-bottom { flex: 3.25; }  /* 剧本文本区域矮些 */
+      /* 图表容器 */
+      .chart-container {
+        width: 100%;
+        height: 100%;
+      }
+      /* 剧本文本相关 */
+      .scene-box {
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        padding: 15px;
+        background-color: #fff;
+        overflow-y: auto;
+      }
+      .scene-title {
+        font-size: 1.4em;
+        margin-bottom: 10px;
+      }
+      .scene-text {
+        font-size: 1.1em;
+        line-height: 1.6;
+        max-height: 10rem;
+        overflow-y: auto;
+      }
+      /* 滚动条样式 */
+      ::-webkit-scrollbar {
+        width: 5px;
+        height: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background-color: rgba(0, 0, 0, 0);
+      }
+      ::-webkit-scrollbar-thumb {
+        background-color: #999;
+        border-radius: 5px;
+        border: 1px solid #eee;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background-color: #555;
+      }
+      /* 评论图区域：固定高度、滚动正常 */
+      #chart6 {
+        width: 100%;
+        height: 300px;
+        overflow-y: auto;
+      }
+      /* 评论翻转效果及调整 */
+      .comment_box {
+        transform-style: preserve-3d;
+        transition: transform 0.6s;
+        cursor: pointer;
+        margin: 10px;
+        padding: 10px;
+        position: relative;
+        border: 1px solid rgba(0, 0, 0, 0.5);
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.8);
+        transform-style: preserve-3d;
+        height: 200px;
+      }
+      
+      .comment_box.flipped{
+        transform: rotateY(180deg);
+      }
+      .comment_box{
+        position: relative;
+        transition: transform 0.5s;
+        transform-style: preserve-3d;
+        height: 200px;
+      }
+      .highlight-scene {
+        background-color: yellow;
+        transition: background-color 0.5s ease;
+      }
+      
+      .comment_front,
+      .comment_back {
+        backface-visibility: hidden;
+        transform-style: preserve-3d;
+        height: 200px;
+      }
+      
+      .comment_front {
+        display: flex;
+        align-items: center;
+        justify-content: center;  
+        transform: rotateY(0deg);
+        width: 100%;
+        height: 100%;
+        z-index: 1;
+      }
+      
+      .comment_back {
+        background-color: #fef8ef;
+        overflow-y: scroll;
+        max-height: 200px;
+        padding-top: 10px;
+        margin-top: -200px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transform: rotateY(180deg);
+        z-index: 2;
+      }
+      
+      .comment_title,
+      .comment_time,
+      .comment_author {
+        font-family: Arial, sans-serif;
+        font-size: 14px;
+        border-radius: 8px;
+        padding: 10px;
+        line-height: 1.4;
+        height: 30%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      
+      .comment_title {
+        background-color: #7c58c3;
+        color: #fff;
+        font-weight: bold;
+        margin-right: 15px;
+      }
+      
+      .comment_time {
+        background-color: #43bcd4;
+        color: #fff;
+        font-weight: bold;
+      }
+      
+      .comment_author {
+        background-color: #e1437b;
+        color: #fff;
+        margin-left: 15px;
+      }
+
+      /* 按钮样式 */
+      .filter-button {
+        background-color: #3498db;
+        color: white;
+        border: none;
+        padding: 5px 10px;
+        font-size: 12px;
+        border-radius: 15px;
+        margin-right: 8px;
+        cursor: pointer;
+        transition: background-color 0.3s ease;
+      }
+      .filter-button:hover {
+        background-color: #2980b9;
+      }
+      .filter-button:active {
+        background-color: #1c5985;
+      }
+      .filter-button-box {
+        display: flex;
+        justify-content: flex-start;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 1px;
+      }
+      .overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0, 0, 0, 0.8);
+        display: none;
+        justify-content: center;
+        align-items: center;
+        flex-wrap: wrap;
+        z-index: 1000;
+      }
+  
+      .overlay .overlay-item {
+        width: 200px;
+        height: 200px;
+        background-color: white;
+        margin: 20px;
+        line-height: 200px;
+        text-align: center;
+        font-size: 24px;
+      }
+  
+      .close-btn {
+        position: absolute;
+        top: 20px;
+        right: 30px;
+        font-size: 24px;
+        color: white;
+        cursor: pointer;
+      }
+
+
+
+
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <!-- 左侧列 -->
+      <div class="column">
+        <div class="module-box">
+          <div class="module-header">评论情感分析</div>
+          <div class="module-content">
+            <div id="chart1" class="chart-container"></div>
+          </div>
+        </div>
+        <div class="module-box">
+          <div class="module-header">词云图</div>
+          <div class="module-content">
+            <div id="chart2" class="chart-container"></div>
+          </div>
+        </div>
+      </div>
+      <!-- 中间列 -->
+      <div class="column middle">
+        <div class="module-box box-top">
+          <div class="module-header">人物关系图</div>
+          <div class="module-content">
+            <div id="chart3" class="chart-container"></div>
+          </div>
+        </div>
+        <div class="module-box box-middle">
+          <div class="module-header">时间轴</div>
+          <div class="module-content">
+            <div id="chart4" class="chart-container" style="height:100%;"></div>
+          </div>
+        </div>
+        <div class="module-box box-bottom">
+          <div class="module-header">剧本文本</div>
+          <div class="module-content">
+            <div id="chart5" class="chart-container">
+              <div class="scene-box" style="overflow-y: auto;">
+                <div class="scene-text">
+                  {% for scene in scenes %}
+                    <div class="scene-title" id="scene_{{ scene.scene_id }}" style="font-size: 16px;">
+                      Scene.{{ scene.scene_id }}<br />
+                      {{ scene.scene_text }}
+                    </div>
+                  {% endfor %}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- 右侧列 -->
+      <div class="column" style="margin-right: 2vw;">
+        <div class="module-box">
+          <div class="module-header">
+            <span style="vertical-align: middle; font-family: 'Orbitronio'; color: #333;">评论图</span>
+            <div class="filter-button-box" style="margin-top: 5px;">
+              <button class="filter-button" onclick="filterComments(1)">好评</button>
+              <button class="filter-button" onclick="filterComments(0)">中性</button>
+              <button class="filter-button" onclick="filterComments(-1)">差评</button>
+              <button class="filter-button" onclick="filterComments()">所有评论</button>
+            </div>
+          </div>
+          <div class="module-content">
+            <div id="chart6" class="chart-container"></div>
+          </div>
+        </div>
+        <div class="module-box">
+          <div class="module-header">发送评论</div>
+          <div class="module-content">
+            <div id="chart7" class="chart-container">
+              <form id="commentForm">
+                {% csrf_token %}
+                <input type="hidden" name="title" value="{{ title }}">
+                <div class="form-group">
+                  <label for="commentText">评论内容</label>
+                  <textarea id="commentText" name="comment_text" class="form-control" rows="4" placeholder="请输入评论..." required></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary" style="float: right; background-color: #007bff; border: none; border-radius: 5px; padding: 10px 20px; font-size: 16px; box-shadow: 0 2px 6px rgba(0,0,0,0.15); transition: background-color 0.3s;">提交评论</button>
+
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="overlay" id="overlay">
+        <div class="close-btn" onclick="closeOverlay()">✖</div>
+      </div>
+    </div>
+
+    <!-- 词云图 -->
+    <script>
+      document.addEventListener('DOMContentLoaded', function () {
+        const urlParams = new URLSearchParams(window.location.search)
+        const title = urlParams.get('title') || '剧本解析'
+      
+        // 设置标题
+        document.title = title
+      
+        // 获取词云数据并初始化图表
+        fetch(`/api/wordcloud/?title=${title}`)
+          .then((response) => response.json())
+          .then((data) => {
+            const words = data.words || {}
+            const getRandomColor = () => {
+              const randomColor = Math.floor(Math.random() * 16777215).toString(16)
+              return '#' + ('000000' + randomColor).slice(-6)
+            }
+      
+            const wordData = Object.entries(words).map(([word, frequency]) => ({
+              name: word,
+              value: frequency,
+              textStyle: {
+                color: getRandomColor()
+              }
+            }))
+      
+            const option = {
+              tooltip: {
+                show: true
+              },
+              series: [
+                {
+                  type: 'wordCloud',
+                  shape: 'circle',
+                  sizeRange: [10, 50],
+                  rotationRange: [-90, 90],
+                  gridSize: 8,
+                  drawOutOfBound: false,
+                  data: wordData
+                }
+              ],
+              textStyle: {
+                normal: {
+                  fontFamily: '微软雅黑',
+                  fontWeight: 'bold',
+                  color: function (params) {
+                    return 'rgb(' + [Math.round(Math.random() * 255), Math.round(Math.random() * 255), Math.round(Math.random() * 255)].join(',') + ')'
+                  }
+                },
+                emphasis: {
+                  shadowBlur: 10,
+                  shadowColor: '#333'
+                }
+              }
+            }
+      
+            // 初始化词云图
+            const chartDom = document.getElementById('chart2')
+            if (chartDom) {
+              const myChart = echarts.init(chartDom)
+              myChart.setOption(option)
+            }
+          })
+          .catch((error) => {
+            console.error('加载词云数据失败：', error)
+          })
+      })
+    </script>
+
+    <!-- 人物关系图 -->
+    <script>
+      const categoryNames = {
+        0: '1',
+        1: '2',
+        2: '3',
+        3: '4',
+        4: '5',
+        5: '6',
+        6: '7',
+        7: '8'
+      };
+      const chartDom = document.getElementById('chart3')
+      const myChart = echarts.init(chartDom, )
+      const url_title = new URLSearchParams(window.location.search).get('title')
+      
+      fetch(`/api/relationship-data/?title=${encodeURIComponent(url_title)}`)
+        .then((response) => response.json())
+        .then((data) => {
+          const option = {
+            tooltip: {
+              formatter: function (params) {
+                const data = params.data;
+                if (data.image) {
+                  const imageUrl = "{% static 'images/' %}" + data.image
+                  return `<img src="${imageUrl}" style="width: 100px; height: 100px;">`;
+                }
+            }
+          },
+            series: [
+              {
+                type: 'graph',
+                layout: 'circular',
+                circular: {
+                  repulsion: 100,
+                  edgeLength: [0, 100],
+                  layoutAnimation: true
+                },
+                lineStyle: {
+                  color: 'source',
+                  curveness: 0.3
+                },
+                data: data.nodes,
+                links: data.links,
+                categories:  data.categories.map(function (cat) {
+                  return { name: categoryNames[cat] };
+                }),
+                roam: true
+              }
+            ],
+            color: [
+            '#5470c6', // 蓝色
+            '#91cc75', // 绿色
+            '#fac858', // 黄色
+            '#ee6666', // 红色
+            '#73c0de', // 浅蓝色
+            '#3ba272', // 深绿色
+            '#fc8452', // 橙色
+            '#9a60b4', // 紫色
+            '#ea7ccc' // 粉色
+          ],
+          legend: [
+          {
+            data: data.categories.map(function (cat) {
+              return categoryNames[cat];
+            }),
+            orient: 'vertical',
+            left: 'left'
+        }
+          ]
+          }
+      
+          // 设置图表的选项
+          myChart.setOption(option)}
+        )
+        .catch((error) => console.error('Error fetching data:', error))
+    </script>
+    
+    <!-- 时间轴 -->
+    <script>
+      var myCharts = echarts.init(document.getElementById('chart4'))
+      var datas = [
+        {% for scene in scenes %}
+        { year: '{{ scene.scene_id }}', value: 0, id: {{ forloop.counter0 }}, itemStyle: { opacity: 1 } },
+        {% endfor %}
+      ];
+      var options = {
+        xAxis: {
+          type: 'category',
+          data: datas.map((item) => item.year),
+          boundaryGap: false,
+          axisLabel: {
+            interval: 0,
+            rotate: 0
+          }
+        },
+        yAxis: {
+          show: false
+        },
+        series: [
+          {
+            name: 'Value',
+            type: 'line',
+            smooth: true,
+            symbolSize: 15,
+            data: datas.map((item) => ({ value: item.value, id: item.id, name: item.year })),
+            value: 0,
+            itemStyle: {
+              normal: {
+                color: '#6e7074',
+                borderColor: '#fff',
+                borderWidth: 1,
+                shadowBlur: 10,
+                shadowColor: 'rgba(0, 0, 0, 0.3)'
+              }
+            },
+            emphasis: {
+              color: 'red',
+              borderWidth: 2,
+              shadowBlur: 20,
+              shadowColor: 'rgba(0, 0, 0, 0.5)'
+            }
+          }
+        ],
+        dataZoom: [
+          {
+            type: 'slider',
+            show: true,
+            startValue: 0,
+            endValue: 7,
+            bottom: 10,
+            height: 10,
+            minValueSpan: 7,
+            maxValueSpan: 7,
+            showDetail: false,
+            backgroundColor: 'paleturquoise',
+            borderColor: 'rgba(128, 128, 128, 0.3)',
+            fillerColor: 'rgba(128, 128, 128, 0.4)',
+            handleColor: 'rgba(128, 128, 128, 0.7)',
+            textStyle: {
+              color: 'rgba(128, 128, 128, 0.7)'
+            },
+            handleSize: '100%',
+            handleStyle: {
+              borderWidth: 0,
+              borderColor: 'transparent',
+              color: '#fff',
+              shadowBlur: 2,
+              shadowColor: 'rgba(0, 0, 0, 0.2)',
+              shadowOffsetX: 1,
+              shadowOffsetY: 1
+            },
+            dataBackground: {
+              lineStyle: {
+                color: 'rgba(128, 128, 128, 0.3)',
+                width: 1,
+                type: 'smooth'
+              },
+              areaStyle: {
+                color: 'rgba(128, 128, 128, 0.1)'
+              }
+            }
+          }
+        ]
+      }
+      
+      myCharts.setOption(options)
+      
+      // 监听节点点击事件
+      myCharts.on('click', function (params) {
+        var clickedSceneId = params.dataIndex + 1 // 因为索引从 0 开始，scene_id 从 1 开始
+        var sceneElement = document.getElementById('scene_' + clickedSceneId)
+        if (sceneElement) {
+          sceneElement.scrollIntoView({ behavior: 'smooth' })
+          sceneElement.classList.add('highlight-scene');
+        }
+      
+        var seriesIndex = params.seriesIndex
+        var dataIndex = params.dataIndex
+      
+        // 获取当前系列的数据
+        var seriesData = myCharts.getOption().series[seriesIndex].data
+      
+        // 更新所有节点的样式
+        var updatedData = seriesData.map(function (item, index) {
+          if (index === dataIndex) {
+            return {
+              id: item.id,
+              value: 0,
+              itemStyle: {
+                color: '#d88a6b'
+              }
+            }
+          } else {
+            return {
+              id: item.id,
+              value: 0,
+              itemStyle: {
+                color: '#6e7074'
+              }
+            }
+          }
+        })
+      
+        // 更新图表数据
+        myCharts.setOption({
+          series: [
+            {
+              seriesIndex: seriesIndex,
+              data: updatedData
+            }
+          ]
+        })
+      
+        // 更新视图
+        var start = myCharts.getOption().dataZoom[0].startValue
+        var end = myCharts.getOption().dataZoom[0].endValue
+        if (dataIndex === end) {
+          var newStartValue = dataIndex
+          var newEndValue = dataIndex + 7
+          myCharts.setOption({
+            dataZoom: [
+              {
+                startValue: newStartValue,
+                endValue: newEndValue
+              }
+            ]
+          })
+        } else if (dataIndex === start) {
+          myCharts.setOption({
+            dataZoom: [
+              {
+                startValue: dataIndex - 7,
+                endValue: dataIndex
+              }
+            ]
+          })
+        }
+      })
+    </script>
+
+    <!--评论筛选-->
+    
+
+    <!-- 评论展示 -->
+    <script>
+      function loadComments(sentiment = null) {
+        const urlParams = new URLSearchParams(window.location.search);
+        const title = urlParams.get('title') || '剧本解析';
+    
+        // 构建请求的 URL，添加 sentiment 参数
+        let url = `/api/show_comments/?title=${title}`;
+        if (sentiment !== null) {
+            url += `&sentiment=${sentiment}`;
+        }
+    
+        fetch(url)
+            .then(response => response.json())
+            .then(data => {
+                if (data.comments) {
+                    const commentsContainer = document.getElementById('chart6');
+                    commentsContainer.innerHTML = ''; // 清空现有评论
+    
+                    data.comments.forEach((comment, index) => {
+                        const commentHTML = `
+                            <div class="comment_box" onclick="flipBox(${index})">
+                                <div class="comment_front" style="background-color: rgba(0, 0, 0, 0); height: 200px;">
+                                    <div class="comment_title">评论 ${index + 1}</div>
+                                    <div class="comment_time">时间: ${comment.comment_time}</div>
+                                    <div class="comment_author">作者: ${comment.username}</div>
+                                </div>
+                                <div class="comment_back" style="background-color: rgba(255, 253, 184, 0); height: 150px;">
+                                    <text style="height: 150px;">${comment.comment_text}</text>
+                                </div>
+                            </div>
+                        `;
+                        commentsContainer.innerHTML += commentHTML;
+                    });
+                }
+            })
+            .catch(error => {
+                console.error('加载评论数据失败：', error);
+            });
+    }
+    
+    // 根据 sentiment 值返回对应的情感文本
+    function getSentimentText(sentiment) {
+        switch (sentiment) {
+            case 1:
+                return '好评';
+            case 0:
+                return '中性';
+            case -1:
+                return '差评';
+            default:
+                return '未知';
+        }
+    }
+    
+    // 筛选评论
+    function filterComments(sentiment) {
+        loadComments(sentiment);  // 调用 loadComments 函数，传入选定的 sentiment 值
+    }
+    
+    // 初始化加载所有评论
+    document.addEventListener('DOMContentLoaded', function () {
+        loadComments();
+    });
+    
+      // 点击反转功能
+      function flipBox(index) {
+        const commentBox = document.querySelectorAll('.comment_box')[index]; // 使用索引直接选择
+        if (commentBox) {
+          console.log(`Flipping box ${index + 1}`);  // 添加日志来检查是否执行
+          commentBox.classList.toggle('flipped');   // 触发翻转效果
+        }
+      }
+
+      document.addEventListener('DOMContentLoaded', function () {
+        const form = document.getElementById('commentForm');
+        form.addEventListener('submit', function(event) {
+            event.preventDefault(); // 防止默认提交行为
+    
+            const commentText = document.getElementById("commentText").value; // 获取评论文本
+            const urlParams = new URLSearchParams(window.location.search);
+            const title = urlParams.get('title') || '剧本解析';
+    
+            // 发送 Ajax 请求提交评论
+            fetch(`/upload_comment/?title=${title}`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,  // CSRF token
+                    'Content-Type': 'application/x-www-form-urlencoded',  // 正确的Content-Type
+                },
+                body: new URLSearchParams({
+                    'comment_text': commentText,
+                    'title': title
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.message === '评论提交成功') {
+                    alert('评论提交成功');
+                    // 清空评论框
+                    document.getElementById("commentText").value = '';
+                    // 重新加载评论
+                    loadComments();
+                    emo_analysize();
+                } else {
+                    alert(data.message);
+                }
+            })
+            .catch(error => {
+                alert('提交失败');
+                console.error(error);
+            });
+        });
+    });
+    </script>
+    
+    <!--情感分析-->
+    <script>
+      function emo_analysize() {
+        // 获取 URL 中的剧本标题参数
+        const urlParams = new URLSearchParams(window.location.search);
+        const title = urlParams.get('title') || '剧本解析';
+    
+        // 构建请求 URL
+        const apiUrl = `/script/overview/get_sentiment_stats/?title=${encodeURIComponent(title)}`;
+    
+        // 使用 Fetch API 获取情感分析结果
+        fetch(apiUrl)
+          .then(response => response.json())
+          .then(data => {
+              // 获取情感分析结果
+              const sentimentProportions = data.sentiment_proportions;
+    
+              // 准备 ECharts 所需的数据
+              const chartData = [
+                  { value: sentimentProportions["褒义"], name: "褒义" },
+                  { value: sentimentProportions["中性"], name: "中性" },
+                  { value: sentimentProportions["贬义"], name: "贬义" }
+              ];
+    
+              // 初始化 ECharts 实例
+              const chart = echarts.init(document.getElementById('chart1'));
+    
+              // 配置图表的选项
+              const option = {
+                  title: {
+                      left: 'center'
+                  },
+                  tooltip: {
+                      trigger: 'item',
+                      formatter: '{b}: {c} ({d}%)'
+                  },
+                  legend: {
+                      show: true,
+                      data: ['褒义', '中性', '贬义'],
+                      orient: 'vertical',
+                      left: 'left'
+                  },
+                  polar: {},
+                  angleAxis: {
+                      type: 'category',
+                      data: ['褒义', '中性', '贬义'],
+                      z: 10
+                  },
+                  radiusAxis: {
+                      min: 0
+                  },
+                  series: [
+                      {
+                          type: 'bar',
+                          data: chartData,
+                          coordinateSystem: 'polar',
+                          name: '情感比例',
+                          stack: '情感',
+                          emphasis: {
+                              focus: 'series'
+                          },
+                          // 根据不同情感设置不同颜色
+                          itemStyle: {
+                            color: function(params) {
+                              const colors = {
+                                '褒义': '#91cc75',  // 绿色
+                                '中性': '#fac858',  // 黄色
+                                '贬义': '#ee6666'   // 红色
+                              };
+                              return colors[params.name] || '#5470c6';
+                            }
+                          }
+                      }
+                  ]
+              };
+    
+              // 使用配置项设置图表
+              chart.setOption(option);
+          })
+          .catch(error => {
+              console.error('获取情感分析结果失败:', error);
+          });
+      }
+    
+      // 等待 DOM 加载完成后执行
+      document.addEventListener('DOMContentLoaded', emo_analysize);
+    </script>
+
+
+    
+    
+  
+    
+  </body>
+</html>

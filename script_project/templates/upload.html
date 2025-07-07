@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>剧本上传系统</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#165DFF',
+                        secondary: '#FF7D00',
+                        neutral: {
+                            100: '#F5F7FA',
+                            200: '#E4E7ED',
+                            300: '#C0C6CF',
+                            400: '#909399',
+                            500: '#606266',
+                            600: '#303133',
+                        }
+                    },
+                    fontFamily: {
+                        inter: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                    boxShadow: {
+                        'card': '0 4px 20px rgba(0, 0, 0, 0.08)',
+                        'card-hover': '0 8px 30px rgba(0, 0, 0, 0.12)',
+                    }
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .form-input-focus {
+                @apply border-primary ring-2 ring-primary/20 transition-all duration-300;
+            }
+            .btn-hover-effect {
+                @apply transform hover:scale-[1.02] hover:shadow-lg active:scale-[0.98] transition-all duration-200;
+            }
+            .animate-fade-in {
+                animation: fadeIn 0.5s ease-in-out;
+            }
+            .animate-slide-up {
+                animation: slideUp 0.5s ease-out;
+            }
+            @keyframes fadeIn {
+                from { opacity: 0; }
+                to { opacity: 1; }
+            }
+            @keyframes slideUp {
+                from { transform: translateY(20px); opacity: 0; }
+                to { transform: translateY(0); opacity: 1; }
+            }
+        }
+    </style>
+</head>
+<body class="bg-neutral-100 font-inter text-neutral-600 min-h-screen">
+    <!-- 导航栏 -->
+    <header class="bg-white shadow-sm sticky top-0 z-50 transition-all duration-300" id="navbar">
+        <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+            <div class="flex items-center space-x-2">
+                <i class="fa-solid fa-file-text text-primary text-2xl"></i>
+                <h1 class="text-xl font-bold text-neutral-600">剧本管理系统</h1>
+            </div>
+            <nav>
+                <ul class="flex space-x-6">
+                    <li><a href="#" class="text-neutral-500 hover:text-primary transition-colors duration-200"><i class="fa-solid fa-home mr-1"></i>首页</a></li>
+                    <li><a href="#" class="text-primary font-medium"><i class="fa-solid fa-cloud-upload mr-1"></i>上传剧本</a></li>
+                    <li><a href="#" class="text-neutral-500 hover:text-primary transition-colors duration-200"><i class="fa-solid fa-list mr-1"></i>剧本列表</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <!-- 主内容区 -->
+    <main class="container mx-auto px-4 py-8 md:py-12">
+        <div class="max-w-3xl mx-auto">
+            <!-- 页面标题 -->
+            <div class="text-center mb-10 animate-fade-in">
+                <h2 class="text-[clamp(1.8rem,3vw,2.5rem)] font-bold text-neutral-600 mb-3">上传新剧本</h2>
+                <p class="text-neutral-400 max-w-xl mx-auto">请填写以下信息并上传剧本文件和封面图片，我们将尽快审核您的内容</p>
+            </div>
+
+            <!-- 上传表单卡片 -->
+            <div class="bg-white rounded-xl shadow-card p-6 md:p-8 mb-8 animate-slide-up" style="animation-delay: 0.1s">
+                <form id="scriptUploadForm" class="space-y-6" enctype="multipart/form-data">
+                    <!-- 基本信息 -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <!-- 剧本名称 -->
+                        <div class="space-y-2">
+                            <label for="scriptName" class="block text-sm font-medium text-neutral-500">剧本名称 <span class="text-red-500">*</span></label>
+                            <div class="relative">
+                                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-neutral-400">
+                                    <i class="fa-solid fa-pencil"></i>
+                                </span>
+                                <input type="text" id="scriptName" name="scriptName" required
+                                    class="w-full pl-10 pr-4 py-3 rounded-lg border border-neutral-200 focus:outline-none focus:form-input-focus"
+                                    placeholder="请输入剧本名称">
+                            </div>
+                        </div>
+
+                        <!-- 剧本类别 -->
+                        <div class="space-y-2">
+                            <label for="scriptCategory" class="block text-sm font-medium text-neutral-500">剧本类别 <span class="text-red-500">*</span></label>
+                            <div class="relative">
+                                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-neutral-400">
+                                    <i class="fa-solid fa-folder-open"></i>
+                                </span>
+                                <select id="scriptCategory" name="scriptCategory" required
+                                    class="w-full pl-10 pr-10 py-3 rounded-lg border border-neutral-200 focus:outline-none focus:form-input-focus appearance-none bg-white">
+                                    <option value="" disabled selected>请选择类别</option>
+                                    <option value="drama">科幻</option>
+                                    <option value="film">动画</option>
+                                    <option value="tv">情感</option>
+                                    <option value="animation">戏剧</option>
+                                    <option value="game">传记</option>
+                                </select>
+                                <span class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-neutral-400">
+                                    <i class="fa-solid fa-chevron-down"></i>
+                                </span>
+                            </div>
+                        </div>
+
+                        <!-- 剧本评分 -->
+                        <div class="space-y-2">
+                            <label for="scriptRating" class="block text-sm font-medium text-neutral-500">剧本评分 <span class="text-red-500">*</span></label>
+                            <div class="relative">
+                                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-neutral-400">
+                                    <i class="fa-solid fa-star text-secondary"></i>
+                                </span>
+                                <input type="number" id="scriptRating" name="scriptRating" min="1" max="10" step="0.1" value="7" required
+                                    class="w-full pl-10 pr-4 py-3 rounded-lg border border-neutral-200 focus:outline-none focus:form-input-focus"
+                                    placeholder="请输入评分（1-10）">
+                                <div class="absolute right-3 top-1/2 transform -translate-y-1/2 text-sm text-neutral-400">/10</div>
+                            </div>
+                            <p class="text-xs text-neutral-400 mt-1">请输入1-10之间的数字，支持一位小数</p>
+                        </div>
+                    </div>
+
+                    <!-- 文件上传区域 -->
+                    <div class="space-y-6">
+                        <!-- 剧本文件上传 -->
+                        <div class="space-y-4">
+                            <label class="block text-sm font-medium text-neutral-500">剧本文件 <span class="text-red-500">*</span></label>
+                            <div id="fileDropArea" class="border-2 border-dashed border-neutral-300 rounded-xl p-8 text-center hover:border-primary transition-colors duration-300 cursor-pointer bg-neutral-50">
+                                <input type="file" id="scriptFile" name="scriptFile" accept=".pdf,.doc,.docx,.txt" class="hidden" required>
+                                <div class="space-y-4">
+                                    <div class="text-primary text-3xl">
+                                        <i class="fa-solid fa-file-text"></i>
+                                    </div>
+                                    <h3 class="text-lg font-medium text-neutral-600">拖放剧本文件到这里，或<span class="text-primary">点击上传</span></h3>
+                                    <p class="text-sm text-neutral-400">支持 PDF、Word、TXT 格式，最大文件大小 50MB</p>
+                                    <div id="filePreview" class="hidden mt-4">
+                                        <div class="bg-white p-4 rounded-lg shadow-sm flex items-center">
+                                            <div class="flex-shrink-0 w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center text-primary">
+                                                <i id="fileIcon" class="fa-solid fa-file-pdf"></i>
+                                            </div>
+                                            <div class="ml-4 flex-grow truncate">
+                                                <p id="fileName" class="font-medium text-neutral-600 truncate"></p>
+                                                <p id="fileSize" class="text-sm text-neutral-400"></p>
+                                            </div>
+                                            <button type="button" id="removeFile" class="text-neutral-400 hover:text-red-500 transition-colors">
+                                                <i class="fa-solid fa-times"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 封面图片上传 -->
+                        <div class="space-y-4">
+                            <label class="block text-sm font-medium text-neutral-500">封面图片 <span class="text-red-500">*</span></label>
+                            <div id="imageDropArea" class="border-2 border-dashed border-neutral-300 rounded-xl p-8 text-center hover:border-primary transition-colors duration-300 cursor-pointer bg-neutral-50">
+                                <input type="file" id="coverImage" name="coverImage" accept="image/*" class="hidden" required>
+                                <div class="space-y-4">
+                                    <div class="text-primary text-3xl">
+                                        <i class="fa-solid fa-image"></i>
+                                    </div>
+                                    <h3 class="text-lg font-medium text-neutral-600">拖放封面图片到这里，或<span class="text-primary">点击上传</span></h3>
+                                    <p class="text-sm text-neutral-400">支持 JPG、PNG、GIF 格式，最大文件大小 10MB</p>
+                                    <div id="imagePreview" class="hidden">
+                                        <div class="mt-4 rounded-lg overflow-hidden shadow-sm border border-neutral-200">
+                                            <img id="previewImage" src="" alt="封面预览" class="w-full h-auto object-cover">
+                                        </div>
+                                        <div class="mt-3 flex justify-between items-center">
+                                            <div class="flex items-center">
+                                                <i class="fa-solid fa-image text-primary mr-2"></i>
+                                                <span id="imageName" class="text-sm font-medium text-neutral-600"></span>
+                                            </div>
+                                            <button type="button" id="removeImage" class="text-neutral-400 hover:text-red-500 transition-colors">
+                                                <i class="fa-solid fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 提交按钮 -->
+                    <div class="pt-4 flex justify-end space-x-4">
+                        <button type="button" id="resetForm" class="px-6 py-3 bg-white border border-neutral-200 rounded-lg text-neutral-500 hover:bg-neutral-50 transition-colors duration-200 btn-hover-effect">
+                            <i class="fa-solid fa-refresh mr-2"></i>重置
+                        </button>
+                        <button type="submit" id="submitForm" class="px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors duration-200 btn-hover-effect">
+                            <i class="fa-solid fa-paper-plane mr-2"></i>提交
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- 上传成功提示（初始隐藏） -->
+            <div id="successMessage" class="hidden bg-green-50 border border-green-200 rounded-xl p-6 mb-8 animate-fade-in">
+                <div class="flex items-start">
+                    <div class="flex-shrink-0 bg-green-100 p-2 rounded-full text-green-500">
+                        <i class="fa-solid fa-check"></i>
+                    </div>
+                    <div class="ml-4">
+                        <h3 class="text-lg font-medium text-green-800">上传成功！</h3>
+                        <div class="mt-2 text-sm text-green-700">
+                            <p>您的剧本已成功提交审核，我们将尽快处理。</p>
+                            <p class="mt-1">您可以在<a href="#" class="text-primary hover:underline">我的剧本</a>中查看审核状态。</p>
+                        </div>
+                        <div class="mt-4 flex">
+                            <button id="uploadAnother" class="text-sm font-medium text-green-700 hover:text-green-900 transition-colors">
+                                <i class="fa-solid fa-plus-circle mr-1"></i>继续上传
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- 页脚 -->
+    <footer class="bg-white border-t border-neutral-200 py-6">
+        <div class="container mx-auto px-4">
+            <div class="flex flex-col md:flex-row justify-between items-center">
+                <div class="mb-4 md:mb-0">
+                    <p class="text-sm text-neutral-400">&copy; 2025 剧本管理系统. 保留所有权利.</p>
+                </div>
+                <div class="flex space-x-6">
+                    <a href="#" class="text-neutral-400 hover:text-primary transition-colors duration-200">
+                        <i class="fa-solid fa-question-circle"></i> 帮助中心
+                    </a>
+                    <a href="#" class="text-neutral-400 hover:text-primary transition-colors duration-200">
+                        <i class="fa-solid fa-file-text"></i> 使用条款
+                    </a>
+                    <a href="#" class="text-neutral-400 hover:text-primary transition-colors duration-200">
+                        <i class="fa-solid fa-envelope"></i> 联系我们
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // 导航栏滚动效果
+        window.addEventListener('scroll', function() {
+            const navbar = document.getElementById('navbar');
+            if (window.scrollY > 10) {
+                navbar.classList.add('py-2', 'shadow');
+                navbar.classList.remove('py-3');
+            } else {
+                navbar.classList.add('py-3');
+                navbar.classList.remove('py-2', 'shadow');
+            }
+        });
+
+        // 文件上传处理
+        const fileDropArea = document.getElementById('fileDropArea');
+        const fileInput = document.getElementById('scriptFile');
+        const filePreview = document.getElementById('filePreview');
+        const fileName = document.getElementById('fileName');
+        const fileSize = document.getElementById('fileSize');
+        const fileIcon = document.getElementById('fileIcon');
+        const removeFile = document.getElementById('removeFile');
+
+        // 图片上传处理
+        const imageDropArea = document.getElementById('imageDropArea');
+        const imageInput = document.getElementById('coverImage');
+        const imagePreview = document.getElementById('imagePreview');
+        const previewImage = document.getElementById('previewImage');
+        const imageName = document.getElementById('imageName');
+        const removeImage = document.getElementById('removeImage');
+
+        // 点击上传区域触发文件选择
+        fileDropArea.addEventListener('click', function(e) {
+            if (e.target.id !== 'removeFile') {
+                fileInput.click();
+            }
+        });
+
+        imageDropArea.addEventListener('click', function(e) {
+            if (e.target.id !== 'removeImage') {
+                imageInput.click();
+            }
+        });
+
+        // 文件选择变化时处理
+        fileInput.addEventListener('change', function() {
+            if (this.files.length > 0) {
+                handleFile(this.files[0]);
+            }
+        });
+
+        imageInput.addEventListener('change', function() {
+            if (this.files.length > 0) {
+                handleImage(this.files[0]);
+            }
+        });
+
+        // 文件拖放功能
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            fileDropArea.addEventListener(eventName, preventDefaults, false);
+            imageDropArea.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            fileDropArea.addEventListener(eventName, highlightFileArea, false);
+            imageDropArea.addEventListener(eventName, highlightImageArea, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            fileDropArea.addEventListener(eventName, unhighlightFileArea, false);
+            imageDropArea.addEventListener(eventName, unhighlightImageArea, false);
+        });
+
+        function highlightFileArea() {
+            fileDropArea.classList.add('border-primary', 'bg-primary/5');
+        }
+
+        function unhighlightFileArea() {
+            fileDropArea.classList.remove('border-primary', 'bg-primary/5');
+        }
+
+        function highlightImageArea() {
+            imageDropArea.classList.add('border-primary', 'bg-primary/5');
+        }
+
+        function unhighlightImageArea() {
+            imageDropArea.classList.remove('border-primary', 'bg-primary/5');
+        }
+
+        fileDropArea.addEventListener('drop', function(e) {
+            const dt = e.dataTransfer;
+            const file = dt.files[0];
+            if (file) {
+                handleFile(file);
+            }
+        }, false);
+
+        imageDropArea.addEventListener('drop', function(e) {
+            const dt = e.dataTransfer;
+            const file = dt.files[0];
+            if (file) {
+                handleImage(file);
+            }
+        }, false);
+
+        // 处理选中的文件
+        function handleFile(file) {
+            // 检查文件类型
+            const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain'];
+            if (!allowedTypes.includes(file.type)) {
+                alert('请上传PDF、Word或TXT格式的文件');
+                return;
+            }
+
+            // 检查文件大小
+            const maxSize = 50 * 1024 * 1024; // 50MB
+            if (file.size > maxSize) {
+                alert('文件大小不能超过50MB');
+                return;
+            }
+
+            // 更新文件图标
+            if (file.type === 'application/pdf') {
+                fileIcon.className = 'fa-solid fa-file-pdf';
+            } else if (file.type === 'text/plain') {
+                fileIcon.className = 'fa-solid fa-file-text';
+            } else {
+                fileIcon.className = 'fa-solid fa-file-word';
+            }
+
+            // 更新文件预览
+            fileName.textContent = file.name;
+            fileSize.textContent = formatFileSize(file.size);
+            filePreview.classList.remove('hidden');
+            fileDropArea.classList.add('border-neutral-200', 'bg-white');
+            fileDropArea.classList.remove('border-dashed', 'border-primary/30', 'bg-primary/5');
+        }
+
+        // 处理选中的图片
+        function handleImage(file) {
+            // 检查文件类型
+            const allowedTypes = ['image/jpeg', 'image/png', 'image/gif'];
+            if (!allowedTypes.includes(file.type)) {
+                alert('请上传JPG、PNG或GIF格式的图片');
+                return;
+            }
+
+            // 检查文件大小
+            const maxSize = 10 * 1024 * 1024; // 10MB
+            if (file.size > maxSize) {
+                alert('图片大小不能超过10MB');
+                return;
+            }
+
+            // 创建图片预览
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                previewImage.src = e.target.result;
+            }
+            reader.readAsDataURL(file);
+
+            // 更新图片信息
+            imageName.textContent = file.name;
+            imagePreview.classList.remove('hidden');
+            imageDropArea.classList.add('border-neutral-200', 'bg-white');
+            imageDropArea.classList.remove('border-dashed', 'border-primary/30', 'bg-primary/5');
+        }
+
+        // 移除文件
+        removeFile.addEventListener('click', function() {
+            fileInput.value = '';
+            filePreview.classList.add('hidden');
+            fileDropArea.classList.remove('border-neutral-200', 'bg-white');
+            fileDropArea.classList.add('border-dashed', 'border-primary/30', 'bg-primary/5');
+        });
+
+        // 移除图片
+        removeImage.addEventListener('click', function() {
+            imageInput.value = '';
+            imagePreview.classList.add('hidden');
+            imageDropArea.classList.remove('border-neutral-200', 'bg-white');
+            imageDropArea.classList.add('border-dashed', 'border-primary/30', 'bg-primary/5');
+        });
+
+        // 格式化文件大小
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        // 重置表单
+        document.getElementById('resetForm').addEventListener('click', function() {
+            document.getElementById('scriptUploadForm').reset();
+            filePreview.classList.add('hidden');
+            fileDropArea.classList.remove('border-neutral-200', 'bg-white');
+            fileDropArea.classList.add('border-dashed', 'border-primary/30', 'bg-primary/5');
+            imagePreview.classList.add('hidden');
+            imageDropArea.classList.remove('border-neutral-200', 'bg-white');
+            imageDropArea.classList.add('border-dashed', 'border-primary/30', 'bg-primary/5');
+        });
+
+        // 表单提交处理
+        document.getElementById('scriptUploadForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            // 验证评分范围
+            const ratingInput = document.getElementById('scriptRating');
+            const rating = parseFloat(ratingInput.value);
+            if (isNaN(rating) || rating < 1 || rating > 10) {
+                alert('请输入1-10之间的有效评分');
+                ratingInput.focus();
+                return;
+            }
+            
+            // 验证文件是否上传
+            if (!fileInput.files.length) {
+                alert('请上传剧本文件');
+                return;
+            }
+            
+            // 验证图片是否上传
+            if (!imageInput.files.length) {
+                alert('请上传封面图片');
+                return;
+            }
+            
+            // 模拟表单提交
+            const submitBtn = document.getElementById('submitForm');
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>提交中...';
+            
+            // 创建FormData对象
+            const formData = new FormData(this);
+            
+            // 发送AJAX请求到后端
+            fetch('/api/upload/', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': getCookie('csrftoken')  // 需要获取CSRF令牌
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    // 显示成功消息
+                    document.getElementById('scriptUploadForm').classList.add('hidden');
+                    document.getElementById('successMessage').classList.remove('hidden');
+                } else {
+                    alert('上传失败: ' + data.message);
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<i class="fa-solid fa-paper-plane mr-2"></i>提交';
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('发生错误，请重试');
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="fa-solid fa-paper-plane mr-2"></i>提交';
+            });
+        });
+
+        // 获取CSRF令牌的辅助函数
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        // 继续上传按钮
+        document.getElementById('uploadAnother').addEventListener('click', function() {
+            document.getElementById('successMessage').classList.add('hidden');
+            document.getElementById('scriptUploadForm').classList.remove('hidden');
+            document.getElementById('scriptUploadForm').reset();
+            filePreview.classList.add('hidden');
+            fileDropArea.classList.remove('border-neutral-200', 'bg-white');
+            fileDropArea.classList.add('border-dashed', 'border-primary/30', 'bg-primary/5');
+            imagePreview.classList.add('hidden');
+            imageDropArea.classList.remove('border-neutral-200', 'bg-white');
+            imageDropArea.classList.add('border-dashed', 'border-primary/30', 'bg-primary/5');
+            
+            const submitBtn = document.getElementById('submitForm');
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="fa-solid fa-paper-plane mr-2"></i>提交';
+        });
+    </script>
+</body>
+</html>
